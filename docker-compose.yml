@@ -1,0 +1,110 @@
+version: "3.9"
+name: integration
+
+
+services:
+  web:
+    container_name: web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./service:/service
+      - static_volume:/service/static
+      - media_volume:/service/media
+    env_file:
+      - service/.env
+    depends_on:
+      - postgres
+    networks:
+      - service
+  daphne:
+    container_name: daphne
+    build:
+      context: .
+      dockerfile: Dockerfile_websocket
+    command: daphne -b 0.0.0.0 -p 8081 supplierIntegration.asgi:application
+    restart: unless-stopped
+    volumes:
+      - static_volume:/service/static
+      - media_volume:/service/media
+    env_file:
+      - service/.env
+    networks:
+      - service
+    depends_on:
+      - web
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    restart: always
+    ports:
+      - "80:80"
+    networks:
+      - service
+    volumes:
+      - ./nginx/conf.d/:/etc/nginx/conf.d/
+      - static_volume:/var/www/html/static
+      - media_volume:/var/www/html/media
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
+    volumes:
+      - postgres_volume:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    env_file:
+      - service/.env
+    networks:
+      - service
+  redis:
+    container_name: redis
+    image: redis/redis-stack-server:latest
+    restart: unless-stopped
+    volumes:
+      - redis_server_volume:/db
+    networks:
+      - service
+    depends_on:
+      - postgres
+  rabbitmq:
+    container_name: rabbitmq
+    image: rabbitmq:3.10.6-management-alpine
+    environment:
+      - RABBITMQ_DEFAULT_USER=developer
+      - RABBITMQ_DEFAULT_PASS=integration
+    volumes:
+      - rabbitmq_volume:/var/lib/rabbitmq/mnesia
+    networks:
+      - service
+    ports:
+      - 5672:5672
+      - 15672:15672
+  celery:
+    container_name: celery
+    build:
+      context: .
+    entrypoint: sh entrypoint-celery.sh
+    restart: unless-stopped
+    env_file:
+      - service/.env
+    volumes:
+      - static_volume:/service/static
+      - media_volume:/service/media
+    networks:
+      - service
+    depends_on:
+      - rabbitmq
+      - redis
+volumes:
+  static_volume:
+  media_volume:
+  postgres_volume:
+  redis_server_volume:
+  rabbitmq_volume:
+
+networks:
+  service:
+    driver: bridge

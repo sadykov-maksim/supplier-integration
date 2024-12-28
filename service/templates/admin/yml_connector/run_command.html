@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h1>Запуск команды обновления</h1>
+  <form method="post">{% csrf_token %}
+      <button type="submit">Запустить команду</button>
+  </form>
+
+  {% if messages %}
+    <ul>
+      {% for message in messages %}
+        <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endblock %}
